@@ -226,12 +226,16 @@ export default function App() {
                 <>
                   <button
                     type="button"
-                    onClick={() => scrollToTop()}
-                    className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs sm:text-sm shadow-md transition"
-                    title="Ir al Panel de Administración en el tope"
+                    onClick={() => handleSelectTab('admin')}
+                    className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm shadow-md transition ${
+                      activeTab === 'admin'
+                        ? 'bg-amber-400 text-slate-950 ring-2 ring-white'
+                        : 'bg-amber-400/90 hover:bg-amber-300 text-slate-950'
+                    }`}
+                    title="Abrir Consola de Administración"
                   >
                     <Unlock className="w-4 h-4" />
-                    <span className="hidden sm:inline">Ir a Consola Admin</span>
+                    <span className="hidden sm:inline">Consola Admin</span>
                     <span className="sm:hidden">Admin</span>
                   </button>
                   <button
@@ -239,6 +243,8 @@ export default function App() {
                     onClick={() => {
                       sessionStorage.removeItem('fiesta_jobos_admin_unlocked');
                       setIsAdmin(false);
+                      setEditingRecord(null);
+                      if (activeTab === 'admin') setActiveTab('all');
                       scrollToTop();
                     }}
                     className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs transition"
@@ -263,7 +269,7 @@ export default function App() {
 
           {/* Desktop Navigation Tabs */}
           <div className="hidden sm:flex items-center justify-between gap-3 mt-4 pt-3 border-t border-emerald-800/70">
-            <nav className="flex items-center gap-2">
+            <nav className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={() => handleSelectTab('all')}
@@ -274,7 +280,7 @@ export default function App() {
                 }`}
               >
                 <LayoutGrid className="w-4 h-4" />
-                <span>Todo el Flujo ({transactions.length})</span>
+                <span>Resumen y Flujo ({transactions.length})</span>
               </button>
 
               <button
@@ -315,12 +321,27 @@ export default function App() {
                 <HelpCircle className="w-4 h-4" />
                 <span>¿Cómo enviar mi pago por ATH Móvil?</span>
               </button>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectTab('admin')}
+                  className={`px-4 py-2 rounded-xl text-sm font-extrabold flex items-center gap-2 transition ${
+                    activeTab === 'admin'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'bg-white/10 text-amber-300 hover:bg-white/20'
+                  }`}
+                >
+                  <Unlock className="w-4 h-4" />
+                  <span>Entrar Depósito / Gasto</span>
+                </button>
+              )}
             </nav>
           </div>
         </div>
       </header>
 
-      {/* Main Content Container (Mobile-optimized on phones, expanded on Tablet & Desktop) */}
+      {/* Main Content Container (Independent screens per tab) */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-3.5 sm:px-6 pt-4 sm:pt-6">
         {/* Cloud Firestore Notice if only visible to Admin when database rules need enabling */}
         {isAdmin && !cloudStatus.connected && (
@@ -340,8 +361,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Admin Console Panel (Only visible when PIN 1270 is entered) */}
-        {isAdmin && (
+        {/* SCREEN 1: ADMIN CONSOLE VIEW (Shown at the very top when activeTab === 'admin') */}
+        {isAdmin && activeTab === 'admin' && (
           <AdminConsole
             editingRecord={editingRecord}
             onClearEditingRecord={() => setEditingRecord(null)}
@@ -351,96 +372,189 @@ export default function App() {
               sessionStorage.removeItem('fiesta_jobos_admin_unlocked');
               setIsAdmin(false);
               setEditingRecord(null);
+              setActiveTab('all');
+              scrollToTop();
             }}
           />
         )}
 
-        {/* KPI Summary Cards — Easy to read for all ages */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-6">
-          {/* Card 1: Balance Disponible */}
-          <div className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-3xl p-5 shadow-lg border border-emerald-700 relative overflow-hidden">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-200">
-                Balance Disponible
-              </span>
-              <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-amber-300" />
+        {/* SCREEN 2: RESUMEN (ALL) — Shows the 4 large KPI Summary Cards at the top */}
+        {activeTab === 'all' && (
+          <>
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5">
+              {/* Card 1: Balance Disponible */}
+              <div className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-3xl p-5 shadow-lg border border-emerald-700 relative overflow-hidden">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-200">
+                    Balance Disponible
+                  </span>
+                  <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center">
+                    <Wallet className="w-5 h-5 text-amber-300" />
+                  </div>
+                </div>
+                <div className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+                  {formatCurrency(stats.balance)}
+                </div>
+                <p className="text-xs text-emerald-200 mt-1.5 font-medium">
+                  Fondos netos actuales para la Fiesta
+                </p>
+              </div>
+
+              {/* Card 2: Total Recaudado (Depósitos) */}
+              <div
+                onClick={() => handleSelectTab('deposits')}
+                className="bg-white rounded-3xl p-5 shadow-sm border-2 border-emerald-200 hover:border-emerald-400 cursor-pointer transition"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-800">
+                    Total Depósitos (Ingresos)
+                  </span>
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-emerald-700">
+                  +{formatCurrency(stats.totalDeposits)}
+                </div>
+                <p className="text-xs text-emerald-700 mt-1.5 font-bold underline">
+                  Ver {stats.depositCount} {stats.depositCount === 1 ? 'depósito' : 'depósitos'} &rarr;
+                </p>
+              </div>
+
+              {/* Card 3: Total Gastos Pagados */}
+              <div
+                onClick={() => handleSelectTab('expenses')}
+                className="bg-white rounded-3xl p-5 shadow-sm border-2 border-rose-200 hover:border-rose-400 cursor-pointer transition"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-rose-800">
+                    Total Gastos Pagados
+                  </span>
+                  <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                    <TrendingDown className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-rose-700">
+                  -{formatCurrency(stats.totalExpenses)}
+                </div>
+                <p className="text-xs text-rose-700 mt-1.5 font-bold underline">
+                  Ver {stats.expenseCount} {stats.expenseCount === 1 ? 'gasto con recibo' : 'gastos con recibo'} &rarr;
+                </p>
+              </div>
+
+              {/* Card 4: Personas y Campers Confirmados */}
+              <div
+                onClick={() => handleSelectTab('deposits')}
+                className="bg-white rounded-3xl p-5 shadow-sm border-2 border-blue-200 hover:border-blue-400 cursor-pointer transition"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-blue-900">
+                    Asistencia Confirmada
+                  </span>
+                  <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <Users className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl sm:text-3xl font-black text-blue-900">
+                    {stats.totalPeople}
+                  </span>
+                  <span className="text-sm font-bold text-slate-600">Personas</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1.5 font-semibold">
+                  De {stats.totalCampers} {stats.totalCampers === 1 ? 'Camper participante' : 'Campers participantes'}
+                </p>
+              </div>
+            </section>
+
+            {/* Compact Help Strip on Resumen view */}
+            <div className="bg-gradient-to-r from-amber-50 via-white to-emerald-50 border border-amber-300/80 rounded-2xl px-4 py-3 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
+              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-800 flex-wrap">
+                <img
+                  src="/ath_logo_circle.png"
+                  alt="ATH"
+                  className="w-7 h-7 rounded-full shrink-0 object-contain"
+                />
+                <span>
+                  <strong>Enviar pago por ATH Móvil al:</strong>{' '}
+                  <strong className="text-orange-600 font-black text-sm">787-598-3594</strong>{' '}
+                  (Edgar Arroyo) • Escribe en el mensaje:{' '}
+                  <code className="bg-amber-100/90 text-amber-950 px-2 py-0.5 rounded-lg font-extrabold">
+                    Nombre - Camper # - # personas
+                  </code>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSelectTab('instructions')}
+                className="text-xs font-extrabold text-emerald-800 hover:underline self-end sm:self-auto shrink-0"
+              >
+                Ver instrucciones &rarr;
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* SCREEN 3: DEDICATED DEPOSITS HEADER (Shown right at the top when activeTab === 'deposits') */}
+        {activeTab === 'deposits' && (
+          <section className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-3xl p-5 sm:p-6 mb-5 shadow-lg border border-emerald-700">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider bg-emerald-500/25 text-emerald-200 px-3 py-1 rounded-full border border-emerald-400/30 mb-2">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  Sección de Ingresos
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+                  Depósitos Recibidos
+                </h2>
+                <p className="text-xs sm:text-sm text-emerald-100 mt-1">
+                  Pagos confirmados por residentes para la Fiesta de Navidad ({stats.totalPeople} personas de {stats.totalCampers} campers)
+                </p>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/15 text-left sm:text-right shrink-0">
+                <span className="text-xs uppercase tracking-wider text-emerald-200 font-bold block">
+                  Total Recaudado ({stats.depositCount})
+                </span>
+                <span className="text-2xl sm:text-3xl font-black text-emerald-300">
+                  +{formatCurrency(stats.totalDeposits)}
+                </span>
               </div>
             </div>
-            <div className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-              {formatCurrency(stats.balance)}
-            </div>
-            <p className="text-xs text-emerald-200 mt-1.5 font-medium">
-              Fondos netos actuales para la Fiesta
-            </p>
-          </div>
+          </section>
+        )}
 
-          {/* Card 2: Total Recaudado (Depósitos) */}
-          <div
-            onClick={() => handleSelectTab('deposits')}
-            className="bg-white rounded-3xl p-5 shadow-sm border-2 border-emerald-200 hover:border-emerald-400 cursor-pointer transition"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-800">
-                Total Depósitos (Ingresos)
-              </span>
-              <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5" />
+        {/* SCREEN 4: DEDICATED EXPENSES HEADER (Shown right at the top when activeTab === 'expenses') */}
+        {activeTab === 'expenses' && (
+          <section className="bg-gradient-to-r from-rose-900 via-rose-800 to-red-900 text-white rounded-3xl p-5 sm:p-6 mb-5 shadow-lg border border-rose-700">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider bg-rose-500/25 text-rose-200 px-3 py-1 rounded-full border border-rose-400/30 mb-2">
+                  <TrendingDown className="w-3.5 h-3.5" />
+                  Sección de Desembolsos y Facturas
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+                  Gastos Pagados
+                </h2>
+                <p className="text-xs sm:text-sm text-rose-100 mt-1">
+                  Cada gasto cuenta con su recibo o factura adjunta para inspección (toca &ldquo;📷 Ver Recibo&rdquo;)
+                </p>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/15 text-left sm:text-right shrink-0">
+                <span className="text-xs uppercase tracking-wider text-rose-200 font-bold block">
+                  Total Gastado ({stats.expenseCount})
+                </span>
+                <span className="text-2xl sm:text-3xl font-black text-rose-200">
+                  -{formatCurrency(stats.totalExpenses)}
+                </span>
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-emerald-700">
-              +{formatCurrency(stats.totalDeposits)}
-            </div>
-            <p className="text-xs text-slate-500 mt-1.5 font-semibold">
-              {stats.depositCount} {stats.depositCount === 1 ? 'depósito recibido' : 'depósitos recibidos'}
-            </p>
-          </div>
+          </section>
+        )}
 
-          {/* Card 3: Total Gastos Pagados */}
-          <div
-            onClick={() => handleSelectTab('expenses')}
-            className="bg-white rounded-3xl p-5 shadow-sm border-2 border-rose-200 hover:border-rose-400 cursor-pointer transition"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-rose-800">
-                Total Gastos Pagados
-              </span>
-              <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center">
-                <TrendingDown className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-rose-700">
-              -{formatCurrency(stats.totalExpenses)}
-            </div>
-            <p className="text-xs text-slate-500 mt-1.5 font-semibold">
-              {stats.expenseCount} {stats.expenseCount === 1 ? 'gasto con recibo' : 'gastos con recibo'}
-            </p>
-          </div>
-
-          {/* Card 4: Personas y Campers Confirmados */}
-          <div className="bg-white rounded-3xl p-5 shadow-sm border-2 border-blue-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-blue-900">
-                Asistencia Confirmada
-              </span>
-              <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center">
-                <Users className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-black text-blue-900">
-                {stats.totalPeople}
-              </span>
-              <span className="text-sm font-bold text-slate-600">Personas</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1.5 font-semibold">
-              De {stats.totalCampers} {stats.totalCampers === 1 ? 'Camper participante' : 'Campers participantes'}
-            </p>
-          </div>
-        </section>
-
-        {/* Instructions View or Compact Instructions Banner */}
-        {activeTab === 'instructions' ? (
+        {/* SCREEN 5: ATH MOVIL INSTRUCTIONS VIEW (Shown right at the top when activeTab === 'instructions') */}
+        {activeTab === 'instructions' && (
           <section className="bg-white rounded-3xl shadow-md border-2 border-amber-300 p-5 sm:p-8 mb-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-200">
               <div className="flex items-center gap-3.5">
@@ -464,7 +578,7 @@ export default function App() {
                 onClick={() => handleSelectTab('all')}
                 className="self-start md:self-auto px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-bold"
               >
-                &larr; Volver al Informe de Ingresos y Gastos
+                &larr; Volver al Resumen
               </button>
             </div>
 
@@ -526,32 +640,6 @@ export default function App() {
               </div>
             </div>
           </section>
-        ) : (
-          /* Compact Help Strip on main views */
-          <div className="bg-gradient-to-r from-amber-50 via-white to-emerald-50 border border-amber-300/80 rounded-2xl px-4 py-3 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
-            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-800 flex-wrap">
-              <img
-                src="/ath_logo_circle.png"
-                alt="ATH"
-                className="w-7 h-7 rounded-full shrink-0 object-contain"
-              />
-              <span>
-                <strong>Enviar pago por ATH Móvil al:</strong>{' '}
-                <strong className="text-orange-600 font-black text-sm">787-598-3594</strong>{' '}
-                (Edgar Arroyo) • Escribe en el mensaje:{' '}
-                <code className="bg-amber-100/90 text-amber-950 px-2 py-0.5 rounded-lg font-extrabold">
-                  Nombre - Camper # - # personas
-                </code>
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleSelectTab('instructions')}
-              className="text-xs font-extrabold text-emerald-800 hover:underline self-end sm:self-auto shrink-0"
-            >
-              Ver instrucciones &rarr;
-            </button>
-          </div>
         )}
 
         {/* Filter & Search Bar */}
@@ -786,6 +874,7 @@ export default function App() {
                                   type="button"
                                   onClick={() => {
                                     setEditingRecord({ ...tx, _editTs: Date.now() });
+                                    setActiveTab('admin');
                                     scrollToTop();
                                   }}
                                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-extrabold text-xs sm:text-sm border border-amber-300 transition shadow-sm"
@@ -906,6 +995,7 @@ export default function App() {
         onSuccess={() => {
           sessionStorage.setItem('fiesta_jobos_admin_unlocked', 'true');
           setIsAdmin(true);
+          setActiveTab('admin');
           setPinModalOpen(false);
           scrollToTop();
         }}
