@@ -156,26 +156,25 @@ export default function App() {
 
   const handleSaveTransaction = async (data) => {
     const saved = await createTransaction(data);
-    if (!cloudStatus.connected) {
-      setTransactions((prev) => [saved, ...prev]);
-    }
+    setTransactions((prev) => {
+      const filtered = prev.filter(
+        (item) => item.id !== saved.id && item.createdAtMs !== saved.createdAtMs
+      );
+      return [saved, ...filtered];
+    });
     return saved;
   };
 
   const handleUpdateTransaction = async (id, data) => {
     await updateTransaction(id, data);
-    if (!cloudStatus.connected) {
-      setTransactions((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, ...data } : item))
-      );
-    }
+    setTransactions((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...data } : item))
+    );
   };
 
   const handleDeleteTransaction = async (id) => {
     await removeTransaction(id);
-    if (!cloudStatus.connected) {
-      setTransactions((prev) => prev.filter((item) => item.id !== id));
-    }
+    setTransactions((prev) => prev.filter((item) => item.id !== id));
   };
 
   const handleCopyFormat = () => {
@@ -847,25 +846,37 @@ export default function App() {
                           </div>
 
                           <div className="flex flex-wrap items-center justify-end gap-2">
-                            {tx.receiptImage ? (
+                            {/* Expenses: Everyone can view the receipt image */}
+                            {!isDeposit && tx.receiptImage && (
                               <button
                                 type="button"
                                 onClick={() => setSelectedReceiptTx(tx)}
-                                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs sm:text-sm shadow-sm transition ${
-                                  isDeposit
-                                    ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                                    : 'bg-rose-700 hover:bg-rose-800 text-white'
-                                }`}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs sm:text-sm shadow-sm transition bg-rose-700 hover:bg-rose-800 text-white"
                               >
                                 <Eye className="w-4 h-4" />
                                 <span>📷 Ver Recibo</span>
                               </button>
-                            ) : (
-                              <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl">
-                                {tx.paymentMethod?.toLowerCase().includes('cash')
-                                  ? '💵 Pago en Cash (Sin foto)'
-                                  : 'Sin imagen de recibo'}
-                              </span>
+                            )}
+
+                            {/* Deposits: ONLY Admin can view the receipt image to protect payer privacy */}
+                            {isDeposit && isAdmin && (
+                              tx.receiptImage ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedReceiptTx(tx)}
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-extrabold text-xs sm:text-sm shadow-sm transition bg-emerald-700 hover:bg-emerald-800 text-white"
+                                  title="Solo visible para el Administrador"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  <span>🔒 Ver Recibo (Admin)</span>
+                                </button>
+                              ) : (
+                                <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl">
+                                  {tx.paymentMethod?.toLowerCase().includes('cash')
+                                    ? '💵 Cash (Sin foto)'
+                                    : 'Sin imagen'}
+                                </span>
+                              )
                             )}
 
                             {isAdmin && (
@@ -986,6 +997,7 @@ export default function App() {
       {/* Modals */}
       <ReceiptModal
         transaction={selectedReceiptTx}
+        isAdmin={isAdmin}
         onClose={() => setSelectedReceiptTx(null)}
       />
 

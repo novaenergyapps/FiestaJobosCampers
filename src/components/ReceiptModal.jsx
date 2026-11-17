@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { X, ZoomIn, ZoomOut, Download, Calendar, User, Home, Users, FileText, DollarSign } from 'lucide-react';
 
-export default function ReceiptModal({ transaction, onClose }) {
+export default function ReceiptModal({ transaction, isAdmin = false, onClose }) {
   const [zoomed, setZoomed] = useState(false);
 
   if (!transaction) return null;
 
   const isDeposit = transaction.type === 'deposit';
+  if (isDeposit && !isAdmin) return null;
   const formattedAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD'

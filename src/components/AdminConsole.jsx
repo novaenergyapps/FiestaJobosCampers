@@ -659,7 +659,7 @@ export default function AdminConsole({
                       ✅ Imagen del recibo lista para guardar {depImageKb ? `(${depImageKb} KB)` : ''}
                     </p>
                     <p className="text-xs text-slate-500">
-                      Los residentes podrán verla tocando &ldquo;Ver Recibo&rdquo;.
+                      🔒 Privado: Solo el Administrador puede ver las imágenes de depósitos.
                     </p>
                   </div>
                 </div>
