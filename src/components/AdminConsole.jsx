@@ -164,13 +164,13 @@ export default function AdminConsole({
       const nextCamper = parsed.camperNumber || depCamper;
       const nextPeople = parsed.peopleCount || depPeople || '1';
       const nextAmount = parsed.amount || depAmount;
-      const nextNotes = parsed.reference ? `Ref ATH: ${parsed.reference}` : depNotes;
+      const nextDate = parsed.date || depDate || todayStr();
 
       if (parsed.name) setDepName(parsed.name);
       if (parsed.camperNumber) setDepCamper(parsed.camperNumber);
       if (parsed.peopleCount) setDepPeople(parsed.peopleCount);
       if (parsed.amount) setDepAmount(parsed.amount);
-      if (parsed.reference && !depNotes) setDepNotes(`Ref ATH: ${parsed.reference}`);
+      if (parsed.date) setDepDate(parsed.date);
 
       setOcrRunning(false);
 
@@ -184,8 +184,8 @@ export default function AdminConsole({
           peopleCount: Number(nextPeople) || 1,
           amount: Number(nextAmount) || 0,
           paymentMethod: 'ATH Móvil',
-          date: depDate || todayStr(),
-          notes: nextNotes,
+          date: nextDate,
+          notes: depNotes,
           receiptImage: compressed.dataUrl
         });
         setSaving(false);
