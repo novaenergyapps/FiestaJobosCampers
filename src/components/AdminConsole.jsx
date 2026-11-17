@@ -16,7 +16,7 @@ import {
   Home,
   Users
 } from 'lucide-react';
-import { compressReceiptImage } from '../utils/imageCompressor';
+import { compressReceiptImage, prepareImageForOcr } from '../utils/imageCompressor';
 import { analyzeAthReceiptImage, parseAthReceiptText } from '../utils/athReceiptParser';
 
 const getLocalDateString = () => {
@@ -161,12 +161,13 @@ export default function AdminConsole({
       setDepImage(compressed.dataUrl);
       setDepImageKb(compressed.approxKb);
 
-      // 2. Run OCR to extract ATH Móvil receipt details
-      const analysis = await analyzeAthReceiptImage(compressed.dataUrl, (prog) => {
+      // 2. Run OCR on a resolution-normalized copy of the ORIGINAL image (not the compressed one)
+      const ocrSource = await prepareImageForOcr(file);
+      const analysis = await analyzeAthReceiptImage(ocrSource, (prog) => {
         setOcrProgress(prog);
       });
 
-      const { isCompleteFormat, missingFields, parsed } = analysis;
+      const { isCompleteFormat, needsReview, missingFields, parsed } = analysis;
 
       const nextName = parsed.name || depName;
       const nextCamper = parsed.camperNumber || depCamper;
@@ -182,7 +183,7 @@ export default function AdminConsole({
 
       setOcrRunning(false);
 
-      if (isCompleteFormat && autoSaveOnValidOcr && !editingId) {
+      if (isCompleteFormat && !needsReview && autoSaveOnValidOcr && !editingId) {
         // Automatically save transaction since all fields matched the format!
         setSaving(true);
         await onSaveTransaction({
@@ -202,6 +203,11 @@ export default function AdminConsole({
           'success',
           `¡Recibo de ATH Móvil leído y guardado automáticamente! (${nextName} • ${nextCamper} • ${nextPeople} pers. • $${Number(nextAmount).toFixed(2)})`
         );
+      } else if (isCompleteFormat && needsReview) {
+        setOcrFeedback({
+          status: 'partial',
+          message: `Leí el mensaje: "${parsed.messageRaw || ''}". El # de Camper o el nombre no venían claramente marcados, así que NO lo guardé automáticamente. Verifique los datos abajo y oprima Guardar Depósito.`
+        });
       } else if (isCompleteFormat) {
         setOcrFeedback({
           status: 'complete',

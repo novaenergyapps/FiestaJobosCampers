@@ -51,12 +51,15 @@ function parseReceiptDate(rawText) {
 export function parseMessageContent(messageStr = '') {
   let remaining = String(messageStr || '').trim();
   if (!remaining) {
-    return { name: '', camperNumber: '', peopleCount: '' };
+    return { name: '', camperNumber: '', peopleCount: '', explicit: false };
   }
 
   let name = '';
   let camperNumber = '';
   let peopleCount = '';
+  // "explicit" = the camper number was clearly marked with "#", "Camper" or "Lote" (or hyphen format).
+  // When false, the number was only guessed, so the result must be reviewed by the Admin.
+  let explicit = false;
 
   // 1. Try strict hyphen-separated format first: "Nombre - Camper # - # personas"
   const strictHyphen = remaining.match(
@@ -66,7 +69,8 @@ export function parseMessageContent(messageStr = '') {
     return {
       name: strictHyphen[1].trim().replace(/\s+/g, ' '),
       camperNumber: `Camper ${strictHyphen[2].trim()}`,
-      peopleCount: String(parseInt(strictHyphen[3], 10))
+      peopleCount: String(parseInt(strictHyphen[3], 10)),
+      explicit: true
     };
   }
 
@@ -76,6 +80,7 @@ export function parseMessageContent(messageStr = '') {
   if (explicitCamper) {
     const num = explicitCamper[1] || explicitCamper[2];
     camperNumber = `Camper ${num}`;
+    explicit = true;
     remaining = remaining.replace(explicitCamper[0], ' ');
   }
 
@@ -113,7 +118,7 @@ export function parseMessageContent(messageStr = '') {
     name = cleanedName;
   }
 
-  return { name, camperNumber, peopleCount };
+  return { name, camperNumber, peopleCount, explicit };
 }
 
 /**
@@ -169,6 +174,8 @@ export function parseAthReceiptText(rawText = '') {
 
   // 3. Extract "Message:" / "Mensaje:" line FIRST (this is where the camper info is!)
   let messageLineContent = '';
+  let camperWasExplicit = false;
+  let nameFromSender = false;
   for (let i = 0; i < lines.length; i++) {
     const msgMatch = lines[i].match(/^(?:Message|Mensaje|Nota|Concepto)[:\s]*(.*)$/i);
     if (msgMatch) {
@@ -186,6 +193,7 @@ export function parseAthReceiptText(rawText = '') {
     name = parsedMsg.name;
     camperNumber = parsedMsg.camperNumber;
     peopleCount = parsedMsg.peopleCount;
+    camperWasExplicit = parsedMsg.explicit;
   } else {
     // If there is no "Message:" label (e.g. user pasted just the message line in the quick box),
     // find any line that is NOT "Sent by:", "Date:", "Amount:", "Transfer receipt:"
@@ -198,6 +206,7 @@ export function parseAthReceiptText(rawText = '') {
         name = candidate.name;
         camperNumber = candidate.camperNumber;
         peopleCount = candidate.peopleCount;
+        camperWasExplicit = candidate.explicit;
         break;
       }
     }
@@ -207,6 +216,7 @@ export function parseAthReceiptText(rawText = '') {
   // use the name from "Sent by:"
   if (!name && senderFallbackName) {
     name = senderFallbackName;
+    nameFromSender = true;
   }
 
   const missingFields = [];
@@ -217,8 +227,13 @@ export function parseAthReceiptText(rawText = '') {
 
   const isCompleteFormat = missingFields.length === 0;
 
+  // Safety net: if the camper number was NOT clearly marked (#, Camper, Lote, or hyphen format)
+  // or the name had to be guessed from "Sent by", do NOT auto-save. The Admin reviews it first.
+  const needsReview = isCompleteFormat && (!camperWasExplicit || nameFromSender);
+
   return {
     isCompleteFormat,
+    needsReview,
     missingFields,
     parsed: {
       name,
