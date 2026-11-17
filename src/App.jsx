@@ -57,6 +57,22 @@ export default function App() {
   });
   const [copiedFormat, setCopiedFormat] = useState(false);
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  };
+
+  const handleSelectTab = (nextTab) => {
+    setActiveTab(nextTab);
+    scrollToTop();
+  };
+
+  // Always scroll to the top whenever switching tabs or unlocking Admin mode
+  useEffect(() => {
+    scrollToTop();
+  }, [activeTab, isAdmin]);
+
   useEffect(() => {
     const unsubscribe = subscribeTransactions(
       (items) => {
@@ -202,20 +218,33 @@ export default function App() {
             </div>
 
             {/* Admin Access Button */}
-            <div className="shrink-0">
+            <div className="shrink-0 flex items-center gap-2">
               {isAdmin ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    sessionStorage.removeItem('fiesta_jobos_admin_unlocked');
-                    setIsAdmin(false);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs sm:text-sm shadow-md transition"
-                >
-                  <Unlock className="w-4 h-4" />
-                  <span className="hidden sm:inline">Modo Admin Activo</span>
-                  <span className="sm:hidden">Admin</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => scrollToTop()}
+                    className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs sm:text-sm shadow-md transition"
+                    title="Ir al Panel de Administración en el tope"
+                  >
+                    <Unlock className="w-4 h-4" />
+                    <span className="hidden sm:inline">Ir a Consola Admin</span>
+                    <span className="sm:hidden">Admin</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sessionStorage.removeItem('fiesta_jobos_admin_unlocked');
+                      setIsAdmin(false);
+                      scrollToTop();
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs transition"
+                    title="Salir del modo Administrador"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-rose-300" />
+                    <span>Salir</span>
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"
@@ -234,7 +263,7 @@ export default function App() {
             <nav className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setActiveTab('all')}
+                onClick={() => handleSelectTab('all')}
                 className={`px-4 py-2 rounded-xl text-sm font-extrabold flex items-center gap-2 transition ${
                   activeTab === 'all'
                     ? 'bg-white text-emerald-950 shadow-md'
@@ -247,7 +276,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setActiveTab('deposits')}
+                onClick={() => handleSelectTab('deposits')}
                 className={`px-4 py-2 rounded-xl text-sm font-extrabold flex items-center gap-2 transition ${
                   activeTab === 'deposits'
                     ? 'bg-emerald-500 text-white shadow-md'
@@ -260,7 +289,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setActiveTab('expenses')}
+                onClick={() => handleSelectTab('expenses')}
                 className={`px-4 py-2 rounded-xl text-sm font-extrabold flex items-center gap-2 transition ${
                   activeTab === 'expenses'
                     ? 'bg-rose-600 text-white shadow-md'
@@ -273,7 +302,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setActiveTab('instructions')}
+                onClick={() => handleSelectTab('instructions')}
                 className={`px-4 py-2 rounded-xl text-sm font-extrabold flex items-center gap-2 transition ${
                   activeTab === 'instructions'
                     ? 'bg-amber-400 text-slate-950 shadow-md'
@@ -345,7 +374,7 @@ export default function App() {
 
           {/* Card 2: Total Recaudado (Depósitos) */}
           <div
-            onClick={() => setActiveTab('deposits')}
+            onClick={() => handleSelectTab('deposits')}
             className="bg-white rounded-3xl p-5 shadow-sm border-2 border-emerald-200 hover:border-emerald-400 cursor-pointer transition"
           >
             <div className="flex items-center justify-between mb-2">
@@ -366,7 +395,7 @@ export default function App() {
 
           {/* Card 3: Total Gastos Pagados */}
           <div
-            onClick={() => setActiveTab('expenses')}
+            onClick={() => handleSelectTab('expenses')}
             className="bg-white rounded-3xl p-5 shadow-sm border-2 border-rose-200 hover:border-rose-400 cursor-pointer transition"
           >
             <div className="flex items-center justify-between mb-2">
@@ -429,7 +458,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setActiveTab('all')}
+                onClick={() => handleSelectTab('all')}
                 className="self-start md:self-auto px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-bold"
               >
                 &larr; Volver al Informe de Ingresos y Gastos
@@ -514,7 +543,7 @@ export default function App() {
             </div>
             <button
               type="button"
-              onClick={() => setActiveTab('instructions')}
+              onClick={() => handleSelectTab('instructions')}
               className="text-xs font-extrabold text-emerald-800 hover:underline self-end sm:self-auto shrink-0"
             >
               Ver instrucciones &rarr;
@@ -530,7 +559,7 @@ export default function App() {
               <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('all')}
+                  onClick={() => handleSelectTab('all')}
                   className={`py-2 px-3 rounded-xl text-xs sm:text-sm font-extrabold transition ${
                     activeTab === 'all'
                       ? 'bg-slate-900 text-white shadow'
@@ -541,7 +570,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('deposits')}
+                  onClick={() => handleSelectTab('deposits')}
                   className={`py-2 px-3 rounded-xl text-xs sm:text-sm font-extrabold transition ${
                     activeTab === 'deposits'
                       ? 'bg-emerald-700 text-white shadow'
@@ -552,7 +581,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('expenses')}
+                  onClick={() => handleSelectTab('expenses')}
                   className={`py-2 px-3 rounded-xl text-xs sm:text-sm font-extrabold transition ${
                     activeTab === 'expenses'
                       ? 'bg-rose-700 text-white shadow'
@@ -773,7 +802,7 @@ export default function App() {
         <div className="grid grid-cols-4 h-16">
           <button
             type="button"
-            onClick={() => setActiveTab('all')}
+            onClick={() => handleSelectTab('all')}
             className={`flex flex-col items-center justify-center gap-1 ${
               activeTab === 'all' ? 'text-emerald-700 font-extrabold' : 'text-slate-500 font-semibold'
             }`}
@@ -784,7 +813,7 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => setActiveTab('deposits')}
+            onClick={() => handleSelectTab('deposits')}
             className={`flex flex-col items-center justify-center gap-1 ${
               activeTab === 'deposits'
                 ? 'text-emerald-700 font-extrabold'
@@ -797,7 +826,7 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => setActiveTab('expenses')}
+            onClick={() => handleSelectTab('expenses')}
             className={`flex flex-col items-center justify-center gap-1 ${
               activeTab === 'expenses'
                 ? 'text-rose-700 font-extrabold'
@@ -810,7 +839,7 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => setActiveTab('instructions')}
+            onClick={() => handleSelectTab('instructions')}
             className={`flex flex-col items-center justify-center gap-1 ${
               activeTab === 'instructions'
                 ? 'text-amber-600 font-extrabold'
@@ -836,6 +865,7 @@ export default function App() {
           sessionStorage.setItem('fiesta_jobos_admin_unlocked', 'true');
           setIsAdmin(true);
           setPinModalOpen(false);
+          scrollToTop();
         }}
       />
     </div>

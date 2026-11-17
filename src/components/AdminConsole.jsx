@@ -345,6 +345,7 @@ export default function AdminConsole({
           onClick={() => {
             resetDepositForm();
             setAdminMode('deposit');
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
           }}
           className={`py-2.5 sm:py-3 px-2 sm:px-4 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition ${
             adminMode === 'deposit'
@@ -361,6 +362,7 @@ export default function AdminConsole({
           onClick={() => {
             resetExpenseForm();
             setAdminMode('expense');
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
           }}
           className={`py-2.5 sm:py-3 px-2 sm:px-4 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition ${
             adminMode === 'expense'
@@ -374,7 +376,10 @@ export default function AdminConsole({
 
         <button
           type="button"
-          onClick={() => setAdminMode('manage')}
+          onClick={() => {
+            setAdminMode('manage');
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+          }}
           className={`py-2.5 sm:py-3 px-2 sm:px-4 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition ${
             adminMode === 'manage'
               ? 'bg-slate-900 text-white shadow-md'
