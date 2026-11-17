@@ -22,7 +22,9 @@ import {
   FileImage,
   HelpCircle,
   Cloud,
-  AlertCircle
+  AlertCircle,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import {
   subscribeTransactions,
@@ -51,6 +53,7 @@ export default function App() {
 
   // Modals & Admin State
   const [selectedReceiptTx, setSelectedReceiptTx] = useState(null);
+  const [editingRecord, setEditingRecord] = useState(null);
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(() => {
     return sessionStorage.getItem('fiesta_jobos_admin_unlocked') === 'true';
@@ -340,14 +343,14 @@ export default function App() {
         {/* Admin Console Panel (Only visible when PIN 1270 is entered) */}
         {isAdmin && (
           <AdminConsole
-            transactions={transactions}
+            editingRecord={editingRecord}
+            onClearEditingRecord={() => setEditingRecord(null)}
             onSaveTransaction={handleSaveTransaction}
             onUpdateTransaction={handleUpdateTransaction}
-            onDeleteTransaction={handleDeleteTransaction}
-            onPreviewReceipt={(tx) => setSelectedReceiptTx(tx)}
             onExitAdmin={() => {
               sessionStorage.removeItem('fiesta_jobos_admin_unlocked');
               setIsAdmin(false);
+              setEditingRecord(null);
             }}
           />
         )}
@@ -742,7 +745,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Right: Amount + View Receipt Button */}
+                        {/* Right: Amount + View Receipt Button + Admin Inline Actions */}
                         <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2.5 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 shrink-0">
                           <div
                             className={`text-xl sm:text-2xl font-black tracking-tight px-3.5 py-1 rounded-2xl ${
@@ -755,26 +758,65 @@ export default function App() {
                             {formatCurrency(tx.amount)}
                           </div>
 
-                          {tx.receiptImage ? (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedReceiptTx(tx)}
-                              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs sm:text-sm shadow-sm transition ${
-                                isDeposit
-                                  ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                                  : 'bg-rose-700 hover:bg-rose-800 text-white'
-                              }`}
-                            >
-                              <Eye className="w-4 h-4" />
-                              <span>📷 Ver Recibo</span>
-                            </button>
-                          ) : (
-                            <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl">
-                              {tx.paymentMethod?.toLowerCase().includes('cash')
-                                ? '💵 Pago en Cash (Sin foto)'
-                                : 'Sin imagen de recibo'}
-                            </span>
-                          )}
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            {tx.receiptImage ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedReceiptTx(tx)}
+                                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs sm:text-sm shadow-sm transition ${
+                                  isDeposit
+                                    ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                                    : 'bg-rose-700 hover:bg-rose-800 text-white'
+                                }`}
+                              >
+                                <Eye className="w-4 h-4" />
+                                <span>📷 Ver Recibo</span>
+                              </button>
+                            ) : (
+                              <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl">
+                                {tx.paymentMethod?.toLowerCase().includes('cash')
+                                  ? '💵 Pago en Cash (Sin foto)'
+                                  : 'Sin imagen de recibo'}
+                              </span>
+                            )}
+
+                            {isAdmin && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingRecord({ ...tx, _editTs: Date.now() });
+                                    scrollToTop();
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-extrabold text-xs sm:text-sm border border-amber-300 transition shadow-sm"
+                                  title="Editar este registro"
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                  <span>Editar</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (
+                                      window.confirm(
+                                        `¿Seguro que deseas eliminar este registro de ${
+                                          isDeposit ? tx.name : tx.paidTo
+                                        } por ${formatCurrency(tx.amount)}?`
+                                      )
+                                    ) {
+                                      handleDeleteTransaction(tx.id);
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-2 rounded-2xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs sm:text-sm border border-rose-200 transition"
+                                  title="Eliminar este registro"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  <span className="hidden md:inline">Borrar</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </article>

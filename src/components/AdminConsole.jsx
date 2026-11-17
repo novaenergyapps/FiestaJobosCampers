@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Upload,
   Sparkles,
@@ -6,15 +6,11 @@ import {
   AlertTriangle,
   PlusCircle,
   Receipt,
-  Edit3,
-  Trash2,
   Camera,
-  Eye,
   Save,
   X,
   RefreshCw,
   LogOut,
-  FileText,
   DollarSign,
   User,
   Home,
@@ -26,14 +22,13 @@ import { analyzeAthReceiptImage, parseAthReceiptText } from '../utils/athReceipt
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export default function AdminConsole({
-  transactions,
+  editingRecord,
+  onClearEditingRecord,
   onSaveTransaction,
   onUpdateTransaction,
-  onDeleteTransaction,
-  onPreviewReceipt,
   onExitAdmin
 }) {
-  const [adminMode, setAdminMode] = useState('deposit'); // 'deposit' | 'expense' | 'manage'
+  const [adminMode, setAdminMode] = useState('deposit'); // 'deposit' | 'expense'
   const [editingId, setEditingId] = useState(null);
 
   // Auto-save switch when ATH Móvil receipt has 100% complete format
@@ -86,6 +81,7 @@ export default function AdminConsole({
     setQuickFormatText('');
     setOcrFeedback(null);
     if (depFileRef.current) depFileRef.current.value = '';
+    if (onClearEditingRecord) onClearEditingRecord();
   };
 
   const resetExpenseForm = () => {
@@ -98,7 +94,34 @@ export default function AdminConsole({
     setExpImage('');
     setExpImageKb(0);
     if (expFileRef.current) expFileRef.current.value = '';
+    if (onClearEditingRecord) onClearEditingRecord();
   };
+
+  // Load record into form when user clicks "Editar" next to any record in the list
+  useEffect(() => {
+    if (!editingRecord) return;
+    setEditingId(editingRecord.id);
+    if (editingRecord.type === 'deposit') {
+      setDepName(editingRecord.name || '');
+      setDepCamper(editingRecord.camperNumber || '');
+      setDepPeople(String(editingRecord.peopleCount || 1));
+      setDepAmount(String(editingRecord.amount || ''));
+      setDepMethod(editingRecord.paymentMethod || 'ATH Móvil');
+      setDepDate(editingRecord.date || todayStr());
+      setDepNotes(editingRecord.notes || '');
+      setDepImage(editingRecord.receiptImage || '');
+      setAdminMode('deposit');
+    } else {
+      setExpPaidTo(editingRecord.paidTo || '');
+      setExpDescription(editingRecord.description || '');
+      setExpCategory(editingRecord.category || 'Comida y Bebida');
+      setExpAmount(String(editingRecord.amount || ''));
+      setExpDate(editingRecord.date || todayStr());
+      setExpImage(editingRecord.receiptImage || '');
+      setAdminMode('expense');
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [editingRecord]);
 
   const showNotice = (type, text) => {
     setBannerMsg({ type, text });
@@ -286,30 +309,6 @@ export default function AdminConsole({
     }
   };
 
-  const startEditRecord = (tx) => {
-    setEditingId(tx.id);
-    if (tx.type === 'deposit') {
-      setDepName(tx.name || '');
-      setDepCamper(tx.camperNumber || '');
-      setDepPeople(String(tx.peopleCount || 1));
-      setDepAmount(String(tx.amount || ''));
-      setDepMethod(tx.paymentMethod || 'ATH Móvil');
-      setDepDate(tx.date || todayStr());
-      setDepNotes(tx.notes || '');
-      setDepImage(tx.receiptImage || '');
-      setAdminMode('deposit');
-    } else {
-      setExpPaidTo(tx.paidTo || '');
-      setExpDescription(tx.description || '');
-      setExpCategory(tx.category || 'Comida y Bebida');
-      setExpAmount(String(tx.amount || ''));
-      setExpDate(tx.date || todayStr());
-      setExpImage(tx.receiptImage || '');
-      setAdminMode('expense');
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   return (
     <div className="bg-white rounded-3xl shadow-xl border-2 border-emerald-700/20 overflow-hidden mb-8">
       {/* Top Admin Header Bar */}
@@ -338,8 +337,8 @@ export default function AdminConsole({
         </button>
       </div>
 
-      {/* Mode Switch Tabs */}
-      <div className="grid grid-cols-3 gap-1.5 p-2 sm:p-3 bg-slate-100 border-b border-slate-200">
+      {/* Mode Switch Tabs (2 clean tabs: Deposit and Expense) */}
+      <div className="grid grid-cols-2 gap-2 p-2.5 sm:p-3 bg-slate-100 border-b border-slate-200">
         <button
           type="button"
           onClick={() => {
@@ -347,7 +346,7 @@ export default function AdminConsole({
             setAdminMode('deposit');
             window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
           }}
-          className={`py-2.5 sm:py-3 px-2 sm:px-4 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition ${
+          className={`py-3 px-3 sm:px-4 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition ${
             adminMode === 'deposit'
               ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
               : 'bg-white text-slate-700 hover:bg-emerald-50'
@@ -364,7 +363,7 @@ export default function AdminConsole({
             setAdminMode('expense');
             window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
           }}
-          className={`py-2.5 sm:py-3 px-2 sm:px-4 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition ${
+          className={`py-3 px-3 sm:px-4 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition ${
             adminMode === 'expense'
               ? 'bg-rose-700 text-white shadow-md shadow-rose-700/20'
               : 'bg-white text-slate-700 hover:bg-rose-50'
@@ -372,22 +371,6 @@ export default function AdminConsole({
         >
           <Receipt className="w-4 h-4 shrink-0" />
           <span>Entrar Gasto</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setAdminMode('manage');
-            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-          }}
-          className={`py-2.5 sm:py-3 px-2 sm:px-4 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition ${
-            adminMode === 'manage'
-              ? 'bg-slate-900 text-white shadow-md'
-              : 'bg-white text-slate-700 hover:bg-slate-200/70'
-          }`}
-        >
-          <Edit3 className="w-4 h-4 shrink-0" />
-          <span>Editar ({transactions.length})</span>
         </button>
       </div>
 
@@ -905,106 +888,6 @@ export default function AdminConsole({
               </button>
             </div>
           </form>
-        </div>
-      )}
-
-      {/* TAB 3: MANAGE / EDIT / DELETE EXISTING RECORDS */}
-      {adminMode === 'manage' && (
-        <div className="p-4 sm:p-6">
-          <h3 className="text-base font-extrabold text-slate-900 mb-3">
-            Todos los Registros ({transactions.length}) — Toca Editar para modificar o añadir recibo
-          </h3>
-
-          {transactions.length === 0 ? (
-            <p className="text-sm text-slate-500 py-8 text-center">
-              Aún no hay transacciones registradas.
-            </p>
-          ) : (
-            <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-              {transactions.map((tx) => {
-                const isDep = tx.type === 'deposit';
-                return (
-                  <div
-                    key={tx.id}
-                    className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div className="flex items-start gap-3">
-                      <span
-                        className={`px-2.5 py-1 rounded-xl text-xs font-extrabold uppercase shrink-0 ${
-                          isDep
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-rose-100 text-rose-800'
-                        }`}
-                      >
-                        {isDep ? 'Depósito' : 'Gasto'}
-                      </span>
-                      <div>
-                        <p className="font-extrabold text-slate-900 text-sm sm:text-base">
-                          {isDep
-                            ? `${tx.name} • ${tx.camperNumber} (${tx.peopleCount || 1} pers.)`
-                            : `${tx.paidTo} — ${tx.description}`}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          Fecha: {tx.date || 'N/A'} •{' '}
-                          {isDep ? tx.paymentMethod || 'ATH Móvil' : tx.category || 'Gasto'} •{' '}
-                          {tx.receiptImage ? '📷 Con Recibo' : 'Sin imagen'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-2 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
-                      <span
-                        className={`font-black text-base px-2.5 py-1 rounded-xl ${
-                          isDep ? 'text-emerald-700' : 'text-rose-700'
-                        }`}
-                      >
-                        {isDep ? '+' : '-'}${Number(tx.amount || 0).toFixed(2)}
-                      </span>
-
-                      {tx.receiptImage && (
-                        <button
-                          type="button"
-                          onClick={() => onPreviewReceipt(tx)}
-                          className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
-                          title="Ver recibo"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => startEditRecord(tx)}
-                        className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs transition"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span>Editar</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `¿Seguro que deseas eliminar este registro de ${
-                                isDep ? tx.name : tx.paidTo
-                              } por $${Number(tx.amount || 0).toFixed(2)}?`
-                            )
-                          ) {
-                            onDeleteTransaction(tx.id);
-                          }
-                        }}
-                        className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs transition"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Borrar</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
     </div>
