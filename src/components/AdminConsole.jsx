@@ -19,7 +19,15 @@ import {
 import { compressReceiptImage } from '../utils/imageCompressor';
 import { analyzeAthReceiptImage, parseAthReceiptText } from '../utils/athReceiptParser';
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const getLocalDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const todayStr = () => getLocalDateString();
 
 export default function AdminConsole({
   editingRecord,
