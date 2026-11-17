@@ -436,7 +436,7 @@ export default function App() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div className="max-w-2xl mx-auto mt-6">
               <div className="space-y-4">
                 {/* ATH Movil Recipient Info Box */}
                 <div className="bg-gradient-to-r from-orange-500 to-amber-600 text-white p-4 sm:p-5 rounded-2xl shadow-md border border-orange-400">
@@ -491,35 +491,6 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-              </div>
-
-              <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 space-y-3">
-                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                  <span>Transparencia Total para el Parque</span>
-                </h3>
-                <ul className="space-y-2.5 text-xs sm:text-sm text-slate-600">
-                  <li className="flex items-start gap-2">
-                    <span className="font-black text-emerald-700">1.</span>
-                    <span>
-                      Todos los depósitos recibidos por <strong>ATH Móvil</strong> o{' '}
-                      <strong>Cash (Efectivo)</strong> aparecen reflejados en este portal.
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-black text-emerald-700">2.</span>
-                    <span>
-                      Cada compra o gasto realizado para la fiesta incluye obligatoriamente un botón{' '}
-                      <strong>&ldquo;📷 Ver Recibo&rdquo;</strong> para que cualquiera pueda ver la foto de la factura o recibo.
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-black text-emerald-700">3.</span>
-                    <span>
-                      Puedes buscar tu nombre o el número de tu Camper en el buscador para verificar tu depósito en cualquier momento.
-                    </span>
-                  </li>
-                </ul>
               </div>
             </div>
           </section>
