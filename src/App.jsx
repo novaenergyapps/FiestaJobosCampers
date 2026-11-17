@@ -24,7 +24,10 @@ import {
   Cloud,
   AlertCircle,
   Edit3,
-  Trash2
+  Trash2,
+  FileSpreadsheet,
+  FileDown,
+  Printer
 } from 'lucide-react';
 import {
   subscribeTransactions,
@@ -35,6 +38,15 @@ import {
 import ReceiptModal from './components/ReceiptModal';
 import PinModal from './components/PinModal';
 import AdminConsole from './components/AdminConsole';
+import FinancialReportModal from './components/FinancialReportModal';
+import {
+  sortDepositsByCamperAsc,
+  sortExpensesByDate
+} from './utils/transactionSorter';
+import {
+  exportFinancialReportPdf,
+  printFinancialReport
+} from './utils/pdfReportGenerator';
 
 const formatCurrency = (val) =>
   new Intl.NumberFormat('en-US', {
@@ -55,6 +67,8 @@ export default function App() {
   const [selectedReceiptTx, setSelectedReceiptTx] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [exportingPdfQuick, setExportingPdfQuick] = useState(false);
   const [isAdmin, setIsAdmin] = useState(() => {
     return sessionStorage.getItem('fiesta_jobos_admin_unlocked') === 'true';
   });
@@ -127,10 +141,10 @@ export default function App() {
     };
   }, [transactions]);
 
-  // Filtered Transactions
+  // Filtered & Sorted Transactions (Deposits by Camper # Asc, Expenses by Date)
   const filteredTransactions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return transactions.filter((tx) => {
+    const matched = transactions.filter((tx) => {
       if (activeTab === 'deposits' && tx.type !== 'deposit') return false;
       if (activeTab === 'expenses' && tx.type !== 'expense') return false;
 
@@ -152,7 +166,32 @@ export default function App() {
 
       return fields.includes(q);
     });
+
+    if (activeTab === 'deposits') {
+      return sortDepositsByCamperAsc(matched);
+    }
+    if (activeTab === 'expenses') {
+      return sortExpensesByDate(matched, 'asc');
+    }
+
+    const depositsSorted = sortDepositsByCamperAsc(
+      matched.filter((tx) => tx.type === 'deposit')
+    );
+    const expensesSorted = sortExpensesByDate(
+      matched.filter((tx) => tx.type === 'expense'),
+      'asc'
+    );
+    return [...depositsSorted, ...expensesSorted];
   }, [transactions, activeTab, searchQuery]);
+
+  const handleQuickExportPdf = async () => {
+    try {
+      setExportingPdfQuick(true);
+      await exportFinancialReportPdf(transactions, stats);
+    } finally {
+      setExportingPdfQuick(false);
+    }
+  };
 
   const handleSaveTransaction = async (data) => {
     const saved = await createTransaction(data);
@@ -463,6 +502,58 @@ export default function App() {
                 <p className="text-xs text-slate-500 mt-1.5 font-semibold">
                   De {stats.totalCampers} {stats.totalCampers === 1 ? 'Camper participante' : 'Campers participantes'}
                 </p>
+              </div>
+            </section>
+
+            {/* Financial Statement Report Banner (Connected to Resumen) */}
+            <section className="bg-white rounded-3xl p-4 sm:p-5 mb-5 shadow-sm border-2 border-emerald-300 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-900 text-amber-300 flex items-center justify-center shrink-0 shadow-sm">
+                  <FileSpreadsheet className="w-6 h-6" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900">
+                      Estado Financiero Oficial
+                    </span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 mt-0.5 leading-snug">
+                    Informe de Ingresos y Gastos — Fiesta de Navidad Jobos Campers Park
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                    Reporte resumido tipo Estado Financiero con ingresos por # de Camper, gastos por fecha y balance disponible para exportar en PDF o imprimir.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setReportModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-emerald-900 hover:bg-emerald-800 text-white font-extrabold text-xs sm:text-sm shadow transition"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-amber-300" />
+                  <span>Ver Estado Financiero</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleQuickExportPdf}
+                  disabled={exportingPdfQuick}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-extrabold text-xs sm:text-sm shadow-sm transition"
+                >
+                  <FileDown className="w-4 h-4" />
+                  <span>{exportingPdfQuick ? 'Generando...' : 'Exportar PDF'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => printFinancialReport(transactions, stats)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs sm:text-sm shadow-sm transition"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Imprimir</span>
+                </button>
               </div>
             </section>
 
@@ -999,6 +1090,13 @@ export default function App() {
         transaction={selectedReceiptTx}
         isAdmin={isAdmin}
         onClose={() => setSelectedReceiptTx(null)}
+      />
+
+      <FinancialReportModal
+        isOpen={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        transactions={transactions}
+        stats={stats}
       />
 
       <PinModal
