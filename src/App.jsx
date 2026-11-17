@@ -215,7 +215,7 @@ export default function App() {
                 </div>
 
                 <h1 className="text-sm sm:text-xl md:text-2xl font-black tracking-tight text-white leading-snug line-clamp-2">
-                  Informe de Ingresos y Gastos de Fiesta de Navidad Jobos Campers Park
+                  Informe de Ingresos y Gastos de Fiesta de Navidad
                 </h1>
               </div>
             </div>
