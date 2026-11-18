@@ -13,7 +13,8 @@ import {
   formatShortDate,
   getFormattedTodaySpanish,
   sortDepositsByCamperAsc,
-  sortExpensesByDate
+  sortExpensesByDate,
+  getDepositAttendance
 } from '../utils/transactionSorter';
 import {
   exportFinancialReportPdf,
@@ -149,8 +150,10 @@ export default function FinancialReportModal({
                       {stats.depositCount === 1 ? 'depósito' : 'depósitos'} •{' '}
                       {stats.totalCampers || 0}{' '}
                       {stats.totalCampers === 1 ? 'camper' : 'campers'} •{' '}
-                      {stats.totalPeople || 0}{' '}
-                      {stats.totalPeople === 1 ? 'persona' : 'personas'})
+                      {stats.totalAdults ?? stats.totalPeople ?? 0}{' '}
+                      {(stats.totalAdults ?? stats.totalPeople ?? 0) === 1 ? 'Adulto' : 'Adultos'} y{' '}
+                      {stats.totalChildren || 0}{' '}
+                      {stats.totalChildren === 1 ? 'Niño' : 'Niños'})
                     </span>
                   </div>
                   <span className="font-black text-emerald-700 shrink-0 text-sm sm:text-base">
@@ -202,8 +205,11 @@ export default function FinancialReportModal({
                       <th className="py-2.5 px-3 border-b border-emerald-700">
                         Residente / Familia
                       </th>
-                      <th className="py-2.5 px-2.5 border-b border-emerald-700 text-center">
-                        Pers.
+                      <th className="py-2.5 px-2 border-b border-emerald-700 text-center">
+                        Adultos
+                      </th>
+                      <th className="py-2.5 px-2 border-b border-emerald-700 text-center">
+                        Niños
                       </th>
                       <th className="py-2.5 px-2.5 border-b border-emerald-700 text-center">
                         Fecha
@@ -217,35 +223,41 @@ export default function FinancialReportModal({
                     {sortedDeposits.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={6}
                           className="py-6 text-center text-slate-500 italic bg-white"
                         >
                           No hay depósitos registrados hasta el momento.
                         </td>
                       </tr>
                     ) : (
-                      sortedDeposits.map((tx, idx) => (
-                        <tr
-                          key={tx.id || idx}
-                          className={idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50/40'}
-                        >
-                          <td className="py-2 px-3 font-extrabold text-emerald-950 whitespace-nowrap">
-                            {parseCamperKey(tx.camperNumber).display}
-                          </td>
-                          <td className="py-2 px-3 font-semibold text-slate-900">
-                            {tx.name || 'Residente'}
-                          </td>
-                          <td className="py-2 px-2.5 text-center font-bold text-slate-700">
-                            {tx.peopleCount || 1}
-                          </td>
-                          <td className="py-2 px-2.5 text-center text-slate-600 whitespace-nowrap text-xs">
-                            {formatShortDate(tx.date)}
-                          </td>
-                          <td className="py-2 px-3 text-right font-extrabold text-emerald-700 whitespace-nowrap">
-                            +{formatCurrency(tx.amount)}
-                          </td>
-                        </tr>
-                      ))
+                      sortedDeposits.map((tx, idx) => {
+                        const att = getDepositAttendance(tx);
+                        return (
+                          <tr
+                            key={tx.id || idx}
+                            className={idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50/40'}
+                          >
+                            <td className="py-2 px-3 font-extrabold text-emerald-950 whitespace-nowrap">
+                              {parseCamperKey(tx.camperNumber).display}
+                            </td>
+                            <td className="py-2 px-3 font-semibold text-slate-900">
+                              {tx.name || 'Residente'}
+                            </td>
+                            <td className="py-2 px-2 text-center font-bold text-slate-700">
+                              {att.adults}
+                            </td>
+                            <td className="py-2 px-2 text-center font-bold text-amber-700">
+                              {att.children}
+                            </td>
+                            <td className="py-2 px-2.5 text-center text-slate-600 whitespace-nowrap text-xs">
+                              {formatShortDate(tx.date)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-extrabold text-emerald-700 whitespace-nowrap">
+                              +{formatCurrency(tx.amount)}
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                   <tfoot>
@@ -254,8 +266,11 @@ export default function FinancialReportModal({
                         TOTAL DE INGRESOS ({stats.depositCount || 0} depósitos •{' '}
                         {stats.totalCampers || 0} campers)
                       </td>
-                      <td className="py-2.5 px-2.5 text-center">
-                        {stats.totalPeople || 0} pers.
+                      <td className="py-2.5 px-2 text-center">
+                        {stats.totalAdults ?? stats.totalPeople ?? 0}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-amber-900">
+                        {stats.totalChildren || 0}
                       </td>
                       <td className="py-2.5 px-2.5" />
                       <td className="py-2.5 px-3 text-right whitespace-nowrap">

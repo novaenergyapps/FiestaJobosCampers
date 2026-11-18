@@ -4,7 +4,8 @@ import {
   formatShortDate,
   getFormattedTodaySpanish,
   sortDepositsByCamperAsc,
-  sortExpensesByDate
+  sortExpensesByDate,
+  getDepositAttendance
 } from './transactionSorter';
 
 const formatCurrency = (val) =>
@@ -179,11 +180,13 @@ export async function exportFinancialReportPdf(transactions = [], stats = {}) {
 
   // Line 1: Total Ingresos
   const row1Y = y + 13.5;
+  const totalAdultsNum = stats.totalAdults ?? stats.totalPeople ?? 0;
+  const totalChildrenNum = stats.totalChildren || 0;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(6, 95, 70); // Emerald-800
   doc.text(
-    `Total de Ingresos (Depósitos Recibidos: ${stats.depositCount || 0} • ${stats.totalCampers || 0} Campers • ${stats.totalPeople || 0} Personas)`,
+    `Total de Ingresos (Depósitos: ${stats.depositCount || 0} • ${stats.totalCampers || 0} Campers • ${totalAdultsNum} Adultos y ${totalChildrenNum} Niños)`,
     margin + 4,
     row1Y
   );
@@ -242,8 +245,9 @@ export async function exportFinancialReportPdf(transactions = [], stats = {}) {
 
     doc.text('# CAMPER', margin + 3, y + 5.1);
     doc.text('RESIDENTE / FAMILIA', margin + 34, y + 5.1);
-    doc.text('PERS.', margin + 118, y + 5.1, { align: 'center' });
-    doc.text('FECHA', margin + 142, y + 5.1, { align: 'center' });
+    doc.text('ADULTOS', margin + 109, y + 5.1, { align: 'center' });
+    doc.text('NIÑOS', margin + 125, y + 5.1, { align: 'center' });
+    doc.text('FECHA', margin + 144, y + 5.1, { align: 'center' });
     doc.text('MONTO', pageWidth - margin - 3, y + 5.1, { align: 'right' });
     y += 7.5;
   };
@@ -291,9 +295,11 @@ export async function exportFinancialReportPdf(transactions = [], stats = {}) {
       doc.setLineWidth(0.15);
       doc.rect(margin, y, contentWidth, rowHeight, 'FD');
 
+      const att = getDepositAttendance(tx);
       const camperLabel = parseCamperKey(tx.camperNumber).display;
-      const residentName = truncateText(doc, tx.name || 'Residente', 76);
-      const peopleStr = String(tx.peopleCount || 1);
+      const residentName = truncateText(doc, tx.name || 'Residente', 66);
+      const adultsStr = String(att.adults);
+      const childrenStr = String(att.children);
       const dateStr = formatShortDate(tx.date);
       const amountStr = `+${formatCurrency(tx.amount)}`;
 
@@ -306,10 +312,11 @@ export async function exportFinancialReportPdf(transactions = [], stats = {}) {
       doc.setTextColor(15, 23, 42);
       doc.text(residentName, margin + 34, y + 4.7);
 
-      doc.text(peopleStr, margin + 118, y + 4.7, { align: 'center' });
+      doc.text(adultsStr, margin + 109, y + 4.7, { align: 'center' });
+      doc.text(childrenStr, margin + 125, y + 4.7, { align: 'center' });
 
       doc.setTextColor(71, 85, 105);
-      doc.text(dateStr, margin + 142, y + 4.7, { align: 'center' });
+      doc.text(dateStr, margin + 144, y + 4.7, { align: 'center' });
 
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(6, 95, 70);
@@ -332,7 +339,8 @@ export async function exportFinancialReportPdf(transactions = [], stats = {}) {
       margin + 3,
       y + 5.1
     );
-    doc.text(`${stats.totalPeople || 0} pers.`, margin + 118, y + 5.1, { align: 'center' });
+    doc.text(`${totalAdultsNum}`, margin + 109, y + 5.1, { align: 'center' });
+    doc.text(`${totalChildrenNum}`, margin + 125, y + 5.1, { align: 'center' });
     doc.text(`+${formatCurrency(stats.totalDeposits)}`, pageWidth - margin - 3, y + 5.1, {
       align: 'right'
     });
@@ -528,21 +536,25 @@ export function printFinancialReport(transactions = [], stats = {}) {
   const sortedDeposits = sortDepositsByCamperAsc(rawDeposits);
   const sortedExpenses = sortExpensesByDate(rawExpenses, 'asc');
 
+  const totalAdultsNum = stats.totalAdults ?? stats.totalPeople ?? 0;
+  const totalChildrenNum = stats.totalChildren || 0;
+
   const depositRowsHtml =
     sortedDeposits.length === 0
-      ? `<tr><td colspan="5" style="text-align:center; padding:12px; color:#64748b; font-style:italic;">No hay depósitos registrados hasta el momento.</td></tr>`
+      ? `<tr><td colspan="6" style="text-align:center; padding:12px; color:#64748b; font-style:italic;">No hay depósitos registrados hasta el momento.</td></tr>`
       : sortedDeposits
           .map((tx, idx) => {
             const bg = idx % 2 === 0 ? '#ffffff' : '#f0fdf4';
+            const att = getDepositAttendance(tx);
             const camperLabel = escapeHtml(parseCamperKey(tx.camperNumber).display);
             const name = escapeHtml(tx.name || 'Residente');
-            const people = Number(tx.peopleCount) || 1;
             const date = escapeHtml(formatShortDate(tx.date));
             const amount = `+${formatCurrency(tx.amount)}`;
             return `<tr style="background:${bg};">
               <td style="font-weight:700; color:#064e3b;">${camperLabel}</td>
               <td>${name}</td>
-              <td style="text-align:center;">${people}</td>
+              <td style="text-align:center;">${att.adults}</td>
+              <td style="text-align:center;">${att.children}</td>
               <td style="text-align:center; color:#475569;">${date}</td>
               <td style="text-align:right; font-weight:700; color:#065f46;">${amount}</td>
             </tr>`;
@@ -731,7 +743,7 @@ export function printFinancialReport(transactions = [], stats = {}) {
       <span>Importe (USD)</span>
     </div>
     <div class="statement-row" style="color:#065f46;">
-      <span>Total de Ingresos (Depósitos Recibidos: ${stats.depositCount || 0} • ${stats.totalCampers || 0} Campers • ${stats.totalPeople || 0} Personas)</span>
+      <span>Total de Ingresos (Depósitos: ${stats.depositCount || 0} • ${stats.totalCampers || 0} Campers • ${totalAdultsNum} Adultos y ${totalChildrenNum} Niños)</span>
       <span>+${formatCurrency(stats.totalDeposits)}</span>
     </div>
     <div class="statement-row" style="color:#9f1239;">
@@ -751,9 +763,10 @@ export function printFinancialReport(transactions = [], stats = {}) {
   <table>
     <thead>
       <tr style="background:#065f46;">
-        <th style="width:18%;"># Camper</th>
-        <th style="width:42%;">Residente / Familia</th>
-        <th style="width:10%; text-align:center;">Pers.</th>
+        <th style="width:17%;"># Camper</th>
+        <th style="width:37%;">Residente / Familia</th>
+        <th style="width:8%; text-align:center;">Adultos</th>
+        <th style="width:8%; text-align:center;">Niños</th>
         <th style="width:14%; text-align:center;">Fecha</th>
         <th style="width:16%; text-align:right;">Monto</th>
       </tr>
@@ -762,7 +775,8 @@ export function printFinancialReport(transactions = [], stats = {}) {
       ${depositRowsHtml}
       <tr style="background:#d1fae5; font-weight:800; color:#064e3b;">
         <td colspan="2">TOTAL DE INGRESOS (${stats.depositCount || 0} depósitos • ${stats.totalCampers || 0} campers)</td>
-        <td style="text-align:center;">${stats.totalPeople || 0} pers.</td>
+        <td style="text-align:center;">${totalAdultsNum}</td>
+        <td style="text-align:center;">${totalChildrenNum}</td>
         <td></td>
         <td style="text-align:right;">+${formatCurrency(stats.totalDeposits)}</td>
       </tr>

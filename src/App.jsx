@@ -41,7 +41,8 @@ import AdminConsole from './components/AdminConsole';
 import FinancialReportModal from './components/FinancialReportModal';
 import {
   sortDepositsByCamperAsc,
-  sortExpensesByDate
+  sortExpensesByDate,
+  getDepositAttendance
 } from './utils/transactionSorter';
 import {
   exportFinancialReportPdf,
@@ -110,6 +111,8 @@ export default function App() {
   const stats = useMemo(() => {
     let totalDeposits = 0;
     let totalExpenses = 0;
+    let totalAdults = 0;
+    let totalChildren = 0;
     let totalPeople = 0;
     let depositCount = 0;
     let expenseCount = 0;
@@ -120,7 +123,10 @@ export default function App() {
       if (tx.type === 'deposit') {
         totalDeposits += amt;
         depositCount += 1;
-        totalPeople += Number(tx.peopleCount) || 0;
+        const att = getDepositAttendance(tx);
+        totalAdults += att.adults;
+        totalChildren += att.children;
+        totalPeople += att.total;
         if (tx.camperNumber) {
           campersSet.add(tx.camperNumber.trim().toLowerCase());
         }
@@ -134,6 +140,8 @@ export default function App() {
       totalDeposits,
       totalExpenses,
       balance: totalDeposits - totalExpenses,
+      totalAdults,
+      totalChildren,
       totalPeople,
       depositCount,
       expenseCount,
@@ -347,19 +355,6 @@ export default function App() {
                 <span>Gastos Pagados ({stats.expenseCount})</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => handleSelectTab('instructions')}
-                className={`px-4 py-2 rounded-xl text-sm font-extrabold flex items-center gap-2 transition ${
-                  activeTab === 'instructions'
-                    ? 'bg-amber-400 text-slate-950 shadow-md'
-                    : 'text-amber-200 hover:bg-white/10'
-                }`}
-              >
-                <HelpCircle className="w-4 h-4" />
-                <span>¿Cómo enviar mi pago por ATH Móvil?</span>
-              </button>
-
               {isAdmin && (
                 <button
                   type="button"
@@ -493,14 +488,28 @@ export default function App() {
                     <Users className="w-5 h-5" />
                   </div>
                 </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl sm:text-3xl font-black text-blue-900">
-                    {stats.totalPeople}
-                  </span>
-                  <span className="text-sm font-bold text-slate-600">Personas</span>
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl sm:text-3xl font-black text-blue-900">
+                      {stats.totalAdults}
+                    </span>
+                    <span className="text-sm font-bold text-slate-700">
+                      {stats.totalAdults === 1 ? 'Adulto' : 'Adultos'}
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold text-slate-400">y</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl sm:text-3xl font-black text-amber-600">
+                      {stats.totalChildren}
+                    </span>
+                    <span className="text-sm font-bold text-slate-700">
+                      {stats.totalChildren === 1 ? 'Niño' : 'Niños'}
+                    </span>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-500 mt-1.5 font-semibold">
-                  De {stats.totalCampers} {stats.totalCampers === 1 ? 'Camper participante' : 'Campers participantes'}
+                  De {stats.totalCampers}{' '}
+                  {stats.totalCampers === 1 ? 'Camper participante' : 'Campers participantes'}
                 </p>
               </div>
             </section>
@@ -556,32 +565,6 @@ export default function App() {
                 </button>
               </div>
             </section>
-
-            {/* Compact Help Strip on Resumen view */}
-            <div className="bg-gradient-to-r from-amber-50 via-white to-emerald-50 border border-amber-300/80 rounded-2xl px-4 py-3 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
-              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-800 flex-wrap">
-                <img
-                  src="/ath_logo_circle.png"
-                  alt="ATH"
-                  className="w-7 h-7 rounded-full shrink-0 object-contain"
-                />
-                <span>
-                  <strong>Enviar pago por ATH Móvil al:</strong>{' '}
-                  <strong className="text-orange-600 font-black text-sm">787-598-3594</strong>{' '}
-                  (Edgar Arroyo) • Escribe en el mensaje:{' '}
-                  <code className="bg-amber-100/90 text-amber-950 px-2 py-0.5 rounded-lg font-extrabold">
-                    Nombre - Camper # - # personas
-                  </code>
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleSelectTab('instructions')}
-                className="text-xs font-extrabold text-emerald-800 hover:underline self-end sm:self-auto shrink-0"
-              >
-                Ver instrucciones &rarr;
-              </button>
-            </div>
           </>
         )}
 
@@ -598,7 +581,10 @@ export default function App() {
                   Depósitos Recibidos
                 </h2>
                 <p className="text-xs sm:text-sm text-emerald-100 mt-1">
-                  Pagos confirmados por residentes para la Fiesta de Navidad ({stats.totalPeople} personas de {stats.totalCampers} campers)
+                  Pagos confirmados por residentes para la Fiesta de Navidad ({stats.totalAdults}{' '}
+                  {stats.totalAdults === 1 ? 'Adulto' : 'Adultos'} y {stats.totalChildren}{' '}
+                  {stats.totalChildren === 1 ? 'Niño' : 'Niños'} de {stats.totalCampers}{' '}
+                  {stats.totalCampers === 1 ? 'Camper' : 'Campers'})
                 </p>
               </div>
 
@@ -877,13 +863,25 @@ export default function App() {
                                 </span>
                               )}
 
-                              {isDeposit && (
-                                <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-blue-100 text-blue-950 px-2.5 py-0.5 rounded-full border border-blue-200">
-                                  <Users className="w-3.5 h-3.5 text-blue-700" />
-                                  {tx.peopleCount || 1}{' '}
-                                  {Number(tx.peopleCount) === 1 ? 'Persona' : 'Personas'}
-                                </span>
-                              )}
+                              {isDeposit && (() => {
+                                const att = getDepositAttendance(tx);
+                                return (
+                                  <>
+                                    {att.adults > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-blue-100 text-blue-950 px-2.5 py-0.5 rounded-full border border-blue-200">
+                                        <Users className="w-3.5 h-3.5 text-blue-700" />
+                                        {att.adults} {att.adults === 1 ? 'Adulto' : 'Adultos'}
+                                      </span>
+                                    )}
+                                    {att.children > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-amber-100 text-amber-950 px-2.5 py-0.5 rounded-full border border-amber-300">
+                                        <Users className="w-3.5 h-3.5 text-amber-700" />
+                                        {att.children} {att.children === 1 ? 'Niño' : 'Niños'}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
 
                               {!isDeposit && tx.category && (
                                 <span className="text-xs font-bold bg-rose-50 text-rose-800 px-2.5 py-0.5 rounded-full border border-rose-200">
@@ -1032,7 +1030,7 @@ export default function App() {
 
       {/* Mobile Bottom Navigation Bar (Thumb-friendly for mobile phones) */}
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 pb-[env(safe-area-inset-bottom)] shadow-lg">
-        <div className="grid grid-cols-4 h-16">
+        <div className="grid grid-cols-3 h-16">
           <button
             type="button"
             onClick={() => handleSelectTab('all')}
@@ -1068,19 +1066,6 @@ export default function App() {
           >
             <TrendingDown className="w-5 h-5" />
             <span className="text-[10px]">Gastos ({stats.expenseCount})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSelectTab('instructions')}
-            className={`flex flex-col items-center justify-center gap-1 ${
-              activeTab === 'instructions'
-                ? 'text-amber-600 font-extrabold'
-                : 'text-slate-500 font-semibold'
-            }`}
-          >
-            <HelpCircle className="w-5 h-5" />
-            <span className="text-[10px]">ATH Móvil</span>
           </button>
         </div>
       </nav>

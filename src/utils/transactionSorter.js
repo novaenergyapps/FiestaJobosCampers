@@ -141,3 +141,111 @@ export function sortExpensesByDate(expenses = [], direction = 'asc') {
     return String(a.paidTo || '').localeCompare(String(b.paidTo || ''), 'es');
   });
 }
+
+/**
+ * Returns { adults, children, total } for a deposit record.
+ * Backwards-compatible with older records that only stored `peopleCount` (all counted as adults, 0 children).
+ */
+export function getDepositAttendance(tx = {}) {
+  const hasExplicitAdults =
+    tx.adultsCount !== undefined && tx.adultsCount !== null && tx.adultsCount !== '';
+  const hasExplicitChildren =
+    tx.childrenCount !== undefined && tx.childrenCount !== null && tx.childrenCount !== '';
+
+  const children = hasExplicitChildren ? Math.max(0, parseInt(tx.childrenCount, 10) || 0) : 0;
+  const adults = hasExplicitAdults
+    ? Math.max(0, parseInt(tx.adultsCount, 10) || 0)
+    : Math.max(0, (parseInt(tx.peopleCount, 10) || 1) - children);
+
+  const total = adults + children || Math.max(1, parseInt(tx.peopleCount, 10) || 1);
+  return { adults, children, total };
+}
+
+/**
+ * Infers the breakdown of Adults ($35) and Children ($20) from the paid amount and optional total people count.
+ * - If amount is an exact multiple of $35 (and matches totalPeople if provided), returns requiresChildrenReview = false.
+ * - Otherwise (e.g. $90 for 2 adults + 1 child, $110 for 2 adults + 2 children, $130 for 2 adults + 3 children, etc.),
+ *   returns requiresChildrenReview = true and pre-fills the best matching (adults, children) suggestion so the Admin can confirm or edit any number of children.
+ */
+export function inferAdultsAndChildren(amountVal, totalPeopleVal) {
+  const amount = Number(amountVal) || 0;
+  const totalPeople = Number(totalPeopleVal) || 0;
+
+  if (amount <= 0) {
+    return {
+      adults: totalPeople > 0 ? totalPeople : 1,
+      children: 0,
+      matchedExact: false,
+      requiresChildrenReview: false
+    };
+  }
+
+  const isMultipleOf35 = Math.abs(amount % 35) < 0.01;
+  const expectedAdultsAt35 = Math.round(amount / 35);
+
+  // Pure adults case: e.g. $35 (1p), $70 (2p), $105 (3p), $140 (4p)
+  if (isMultipleOf35 && (!totalPeople || totalPeople === expectedAdultsAt35)) {
+    return {
+      adults: expectedAdultsAt35,
+      children: 0,
+      matchedExact: true,
+      requiresChildrenReview: false
+    };
+  }
+
+  // Not an exact multiple of $35 (or people count differs from amount / 35) -> includes children ($20 each)
+  const validCombinations = [];
+  for (let a = 0; a <= 50; a += 1) {
+    for (let c = 0; c <= 50; c += 1) {
+      if (a === 0 && c === 0) continue;
+      if (Math.abs(a * 35 + c * 20 - amount) < 0.01) {
+        validCombinations.push({ adults: a, children: c, total: a + c });
+      }
+    }
+  }
+
+  // 1. If the message specified total people (e.g. "3 personas" with $90, or "4 personas" with $110), match exact total
+  if (totalPeople > 0) {
+    const exactPeopleMatch = validCombinations.find((comb) => comb.total === totalPeople);
+    if (exactPeopleMatch) {
+      return {
+        adults: exactPeopleMatch.adults,
+        children: exactPeopleMatch.children,
+        matchedExact: true,
+        requiresChildrenReview: true
+      };
+    }
+  }
+
+  // 2. Otherwise pick the combination with at least 1 adult (preferring more adults / fewer children)
+  const withAdults = validCombinations
+    .filter((comb) => comb.adults >= 1)
+    .sort((x, y) => y.adults - x.adults);
+
+  if (withAdults.length > 0) {
+    return {
+      adults: withAdults[0].adults,
+      children: withAdults[0].children,
+      matchedExact: true,
+      requiresChildrenReview: true
+    };
+  }
+
+  if (validCombinations.length > 0) {
+    return {
+      adults: validCombinations[0].adults,
+      children: validCombinations[0].children,
+      matchedExact: true,
+      requiresChildrenReview: true
+    };
+  }
+
+  // 3. Fallback when amount doesn't match a standard $35/$20 combination: let Admin enter manually
+  return {
+    adults: totalPeople > 0 ? totalPeople : 1,
+    children: 0,
+    matchedExact: false,
+    requiresChildrenReview: true
+  };
+}
+

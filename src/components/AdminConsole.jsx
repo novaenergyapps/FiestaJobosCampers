@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { compressReceiptImage, prepareImageForOcr } from '../utils/imageCompressor';
 import { analyzeAthReceiptImage, parseAthReceiptText } from '../utils/athReceiptParser';
+import { getDepositAttendance, inferAdultsAndChildren } from '../utils/transactionSorter';
 
 const getLocalDateString = () => {
   const d = new Date();
@@ -45,7 +46,8 @@ export default function AdminConsole({
   // Deposit Form State
   const [depName, setDepName] = useState('');
   const [depCamper, setDepCamper] = useState('');
-  const [depPeople, setDepPeople] = useState('1');
+  const [depAdults, setDepAdults] = useState('1');
+  const [depChildren, setDepChildren] = useState('0');
   const [depAmount, setDepAmount] = useState('');
   const [depMethod, setDepMethod] = useState('ATH Móvil');
   const [depDate, setDepDate] = useState(todayStr());
@@ -79,7 +81,8 @@ export default function AdminConsole({
     setEditingId(null);
     setDepName('');
     setDepCamper('');
-    setDepPeople('1');
+    setDepAdults('1');
+    setDepChildren('0');
     setDepAmount('');
     setDepMethod('ATH Móvil');
     setDepDate(todayStr());
@@ -110,9 +113,11 @@ export default function AdminConsole({
     if (!editingRecord) return;
     setEditingId(editingRecord.id);
     if (editingRecord.type === 'deposit') {
+      const att = getDepositAttendance(editingRecord);
       setDepName(editingRecord.name || '');
       setDepCamper(editingRecord.camperNumber || '');
-      setDepPeople(String(editingRecord.peopleCount || 1));
+      setDepAdults(String(att.adults));
+      setDepChildren(String(att.children));
       setDepAmount(String(editingRecord.amount || ''));
       setDepMethod(editingRecord.paymentMethod || 'ATH Móvil');
       setDepDate(editingRecord.date || todayStr());
@@ -144,8 +149,18 @@ export default function AdminConsole({
     const result = parseAthReceiptText(val);
     if (result.parsed.name) setDepName(result.parsed.name);
     if (result.parsed.camperNumber) setDepCamper(result.parsed.camperNumber);
-    if (result.parsed.peopleCount) setDepPeople(result.parsed.peopleCount);
     if (result.parsed.amount) setDepAmount(result.parsed.amount);
+
+    const checkAmt = result.parsed.amount || depAmount;
+    const checkPeople = result.parsed.peopleCount;
+    if (checkAmt) {
+      const inferred = inferAdultsAndChildren(checkAmt, checkPeople);
+      setDepAdults(String(inferred.adults));
+      setDepChildren(String(inferred.children));
+    } else if (checkPeople) {
+      setDepAdults(String(checkPeople));
+      setDepChildren('0');
+    }
   };
 
   // Handle Deposit Receipt Upload + Browser Compression + OCR Auto-Detection
@@ -171,26 +186,37 @@ export default function AdminConsole({
 
       const nextName = parsed.name || depName;
       const nextCamper = parsed.camperNumber || depCamper;
-      const nextPeople = parsed.peopleCount || depPeople || '1';
       const nextAmount = parsed.amount || depAmount;
       const nextDate = parsed.date || depDate || todayStr();
 
+      const inferred = inferAdultsAndChildren(nextAmount, parsed.peopleCount);
+
       if (parsed.name) setDepName(parsed.name);
       if (parsed.camperNumber) setDepCamper(parsed.camperNumber);
-      if (parsed.peopleCount) setDepPeople(parsed.peopleCount);
       if (parsed.amount) setDepAmount(parsed.amount);
       if (parsed.date) setDepDate(parsed.date);
 
+      setDepAdults(String(inferred.adults));
+      setDepChildren(String(inferred.children));
+
       setOcrRunning(false);
 
-      if (isCompleteFormat && !needsReview && autoSaveOnValidOcr && !editingId) {
-        // Automatically save transaction since all fields matched the format!
+      if (
+        isCompleteFormat &&
+        !needsReview &&
+        !inferred.requiresChildrenReview &&
+        autoSaveOnValidOcr &&
+        !editingId
+      ) {
+        // Exact multiple of $35 (only adults) and all fields matched -> Auto-save!
         setSaving(true);
         await onSaveTransaction({
           type: 'deposit',
           name: nextName,
           camperNumber: nextCamper,
-          peopleCount: Number(nextPeople) || 1,
+          adultsCount: inferred.adults,
+          childrenCount: 0,
+          peopleCount: inferred.adults,
           amount: Number(nextAmount) || 0,
           paymentMethod: 'ATH Móvil',
           date: nextDate,
@@ -201,12 +227,29 @@ export default function AdminConsole({
         resetDepositForm();
         showNotice(
           'success',
-          `¡Recibo de ATH Móvil leído y guardado automáticamente! (${nextName} • ${nextCamper} • ${nextPeople} pers. • $${Number(nextAmount).toFixed(2)})`
+          `¡Recibo de ATH Móvil leído y guardado automáticamente! (${nextName} • ${nextCamper} • ${inferred.adults} ${
+            inferred.adults === 1 ? 'Adulto' : 'Adultos'
+          } • $${Number(nextAmount).toFixed(2)})`
         );
+      } else if (isCompleteFormat && inferred.requiresChildrenReview) {
+        setOcrFeedback({
+          status: 'partial',
+          message: inferred.matchedExact
+            ? `El total pagado ($${Number(nextAmount).toFixed(
+                2
+              )}) no es múltiplo entero de $35 (incluye niños a $20). Se llenó Nombre, Camper y Cantidad Pagada, con sugerencia de ${
+                inferred.adults
+              } ${inferred.adults === 1 ? 'Adulto' : 'Adultos'} y ${inferred.children} ${
+                inferred.children === 1 ? 'Niño' : 'Niños'
+              }. Por favor corrobore o entre manualmente la Cantidad de Adultos y Cantidad de Niños abajo y oprima Guardar Depósito.`
+            : `El total pagado ($${Number(nextAmount).toFixed(
+                2
+              )}) no es múltiplo entero de $35 (incluye niños a $20). Se llenó Nombre, Camper y Cantidad Pagada. Por favor entre manualmente la Cantidad de Adultos ($35) y Cantidad de Niños ($20) abajo y oprima Guardar Depósito.`
+        });
       } else if (isCompleteFormat && needsReview) {
         setOcrFeedback({
           status: 'partial',
-          message: `Leí el mensaje: "${parsed.messageRaw || ''}". El # de Camper o el nombre no venían claramente marcados, así que NO lo guardé automáticamente. Verifique los datos abajo y oprima Guardar Depósito.`
+          message: `Leí el mensaje: "${parsed.messageRaw || ''}". El # de Camper o el nombre no venían claramente marcados, así que NO lo guardé automáticamente. Verifique los datos abajo (incluyendo Adultos y Niños) y oprima Guardar Depósito.`
         });
       } else if (isCompleteFormat) {
         setOcrFeedback({
@@ -249,6 +292,15 @@ export default function AdminConsole({
       return;
     }
 
+    const adultsCount = Math.max(0, parseInt(depAdults, 10) || 0);
+    const childrenCount = Math.max(0, parseInt(depChildren, 10) || 0);
+    const totalPeopleCount = adultsCount + childrenCount;
+
+    if (totalPeopleCount < 1) {
+      showNotice('error', 'Por favor indique al menos 1 Adulto o 1 Niño.');
+      return;
+    }
+
     const formattedCamper = /^camper/i.test(depCamper.trim())
       ? depCamper.trim()
       : `Camper ${depCamper.trim()}`;
@@ -257,7 +309,9 @@ export default function AdminConsole({
       type: 'deposit',
       name: depName.trim(),
       camperNumber: formattedCamper,
-      peopleCount: Number(depPeople) || 1,
+      adultsCount,
+      childrenCount,
+      peopleCount: totalPeopleCount,
       amount: Number(depAmount) || 0,
       paymentMethod: depMethod,
       date: depDate || todayStr(),
@@ -543,7 +597,7 @@ export default function AdminConsole({
 
           {/* Manual / Pre-filled Deposit Form */}
           <form onSubmit={handleDepositSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
                 <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">
                   Nombre de la Persona *
@@ -578,22 +632,49 @@ export default function AdminConsole({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">
-                  # de Personas *
-                </label>
-                <div className="relative">
-                  <Users className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    required
-                    value={depPeople}
-                    onChange={(e) => setDepPeople(e.target.value)}
-                    placeholder="Ej: 3"
-                    className="w-full pl-10 pr-3.5 py-3 rounded-2xl border border-slate-300 focus:border-emerald-600 focus:outline-none text-sm font-semibold"
-                  />
+              <div className="grid grid-cols-2 gap-3 sm:col-span-2 lg:col-span-2">
+                <div>
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Cantidad de Adultos *
+                  </label>
+                  <div className="relative">
+                    <Users className="w-4 h-4 text-blue-600 absolute left-3 top-3.5" />
+                    <input
+                      type="number"
+                      min="0"
+                      max="50"
+                      required
+                      value={depAdults}
+                      onChange={(e) => setDepAdults(e.target.value)}
+                      placeholder="Ej: 2"
+                      className="w-full pl-9 pr-3 py-3 rounded-2xl border border-slate-300 focus:border-emerald-600 focus:outline-none text-sm font-bold text-slate-900"
+                    />
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500 mt-0.5 block">
+                    $35 por adulto
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Cantidad de Niños
+                  </label>
+                  <div className="relative">
+                    <Users className="w-4 h-4 text-amber-600 absolute left-3 top-3.5" />
+                    <input
+                      type="number"
+                      min="0"
+                      max="50"
+                      required
+                      value={depChildren}
+                      onChange={(e) => setDepChildren(e.target.value)}
+                      placeholder="0"
+                      className="w-full pl-9 pr-3 py-3 rounded-2xl border border-amber-300 bg-amber-50/30 focus:bg-white focus:border-amber-600 focus:outline-none text-sm font-bold text-slate-900"
+                    />
+                  </div>
+                  <span className="text-[11px] font-semibold text-amber-700 mt-0.5 block">
+                    $20 por niño
+                  </span>
                 </div>
               </div>
 
